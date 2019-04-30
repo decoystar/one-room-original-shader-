@@ -60,12 +60,6 @@ float distBox(vec3 p,vec3 b,float r)
 		+ min(max(d.x,max(d.y,d.z)),0.0);
 }
 
-float distSphere(vec3 p)
-{
-	const float size = 0.5;
-	return length(p) - size;	
-}
-
 float distCylinder(vec3 p,float ra,float rb,float h)
 {
 	vec2 d = vec2(length(p.xz) - 2.0 * ra + rb,abs(p.y) - h);
@@ -91,7 +85,6 @@ float distFunc(vec3 p)
 	float reg2 = distBox(rotPos + vec3(-2.0,1.9,-2.0),vec3(0.1,1.5,0.1),0.2);
 	float reg3 = distBox(rotPos + vec3(-2.0,1.9,2.0),vec3(0.1,1.5,0.1),0.2);
 	float reg4 = distBox(rotPos + vec3(2.0,1.9,-2.0),vec3(0.1,1.5,0.1),0.2);
-	float sp = distSphere(moveSp(lightPos));
 	
 	vec3 cupRot = rotate(rotPos,radians(-20.0),vec3(0.0,1.0,0.0));
 	rotPos = vec3(rotPos.x,cupRot.y,rotPos.z);
@@ -104,7 +97,7 @@ float distFunc(vec3 p)
 	float c3 = opSubtract(c2,c);
 	float cup = smoothMin(k,c3,26.0);
 	
-	float pl = distPlane(rotPos,vec3(0.0,1.0,0.0));
+	float pl = distPlane(rotPos+vec3(0.0,-0.06,0.0),vec3(0.0,1.0,0.0));
 	
 	float r1 = min(reg1,reg2);
 	float r2 = min(reg3,reg4);
@@ -125,7 +118,6 @@ vec3 getNormal(vec3 p)
 	));
 }
 
-// 極座標から直行座標へ
 vec3 convert(vec3 p)
 {
 	return vec3(p.x * sin(p.y) * cos(p.z),p.x * sin(p.y) * sin(p.z),p.x * cos(p.y));
@@ -147,18 +139,11 @@ vec4 mainImage(vec2 p)
 	}
 	if(abs(dist) < 0.001){
 		vec3 normal = getNormal(rayPos);
-		// 1: 光源からレイの交点座標との方向を算出する
 		vec3 d = moveSp(lightPos) - rayPos;
-		// 2: 距離を算出
 		float len = length(d);
-		// 3: 方向を正規化
 		d = normalize(d);
-		// 4: 光源と法線ベクトルとの内積で明るさを算出
 		float b = clamp(dot(normal,d),0.02,1.0);
-		// 5:減衰
 		float a = 1.0 / (atte.x + atte.y * len + atte.z * len * len);
-		
-		float diff = clamp(dot(lightPos,normal),0.1,1.0);
 		return vec4(vec3(b * a),1.0);
 	}else{
 		return vec4(vec3(0.0),1.0);	
