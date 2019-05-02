@@ -77,35 +77,46 @@ float distPlane(vec3 p,vec3 n)
 	return dot(p,n) + 3.5;
 }
 
-float distFunc(vec3 p)
+float distCup(vec3 p)
 {
-	vec3 rotPos = rotate(p,radians(-50.0),vec3(0.2,1.0,0.0));
-	float table = distBox(rotPos,vec3(2.5,0.01,2.5),0.3);
-	float reg1 = distBox(rotPos + vec3(2.0,1.9,2.0),vec3(0.1,1.5,0.1),0.2);
-	float reg2 = distBox(rotPos + vec3(-2.0,1.9,-2.0),vec3(0.1,1.5,0.1),0.2);
-	float reg3 = distBox(rotPos + vec3(-2.0,1.9,2.0),vec3(0.1,1.5,0.1),0.2);
-	float reg4 = distBox(rotPos + vec3(2.0,1.9,-2.0),vec3(0.1,1.5,0.1),0.2);
-	
-	vec3 cupRot = rotate(rotPos,radians(-20.0),vec3(0.0,1.0,0.0));
-	rotPos = vec3(rotPos.x,cupRot.y,rotPos.z);
+	vec3 cupRot = rotate(p,radians(-20.0),vec3(0.0,1.0,0.0));
+	p = vec3(p.x,cupRot.y,p.z);
 	vec3 cupOffset = vec3(0.0,-1.07,0.0);
-	float c = distCylinder(rotPos+cupOffset,0.3,0.3,0.5);
-	float c2 = distCylinder(rotPos+cupOffset + vec3(0.0,-0.2,0.0),0.265,0.3,0.4);
-	float t = distTorus(rotPos+cupOffset + vec3(0.45,0.0,0.0),vec2(0.44,0.14));
-	float s = min(rotPos.x + 0.55,1.0);
+	float c = distCylinder(p+cupOffset,0.3,0.3,0.5);
+	float c2 = distCylinder(p+cupOffset + vec3(0.0,-0.2,0.0),0.265,0.3,0.4);
+	float t = distTorus(p+cupOffset + vec3(0.45,0.0,0.0),vec2(0.44,0.14));
+	float s = min(p.x + 0.55,1.0);
 	float k = max(s,t);
 	float c3 = opSubtract(c2,c);
-	float cup = smoothMin(k,c3,26.0);
-	
-	float pl = distPlane(rotPos+vec3(0.0,-0.06,0.0),vec3(0.0,1.0,0.0));
-	
+	return smoothMin(k,c3,26.0);
+}
+
+float distDesk(vec3 p)
+{
+	float table = distBox(p,vec3(2.5,0.01,2.5),0.3);
+	float reg1 = distBox(p + vec3(2.0,1.9,2.0),vec3(0.1,1.5,0.1),0.2);
+	float reg2 = distBox(p + vec3(-2.0,1.9,-2.0),vec3(0.1,1.5,0.1),0.2);
+	float reg3 = distBox(p + vec3(-2.0,1.9,2.0),vec3(0.1,1.5,0.1),0.2);
+	float reg4 = distBox(p + vec3(2.0,1.9,-2.0),vec3(0.1,1.5,0.1),0.2);
 	float r1 = min(reg1,reg2);
 	float r2 = min(reg3,reg4);
 	float r3 = min(r1,r2);
-	float tab = smoothMin(table,r3,5.0);
+	return smoothMin(table,r3,5.0);
+}
+
+float distFloor(vec3 p)
+{
+	return distPlane(p+vec3(0.0,-0.06,0.0),vec3(0.0,1.0,0.0));
+}
+
+float distFunc(vec3 p)
+{
+	vec3 rotPos = rotate(p,radians(-50.0),vec3(0.2,1.0,0.0));
 	
-	float tabPl = min(tab,pl);
-	return min(tabPl,cup);
+	float desk = distDesk(rotPos);
+	float mgcup = distCup(rotPos);
+	float flr = distFloor(rotPos);
+	return min(min(desk,mgcup),flr);
 }
 
 vec3 getNormal(vec3 p)
@@ -118,7 +129,21 @@ vec3 getNormal(vec3 p)
 	));
 }
 
-vec3 convert(vec3 p)
+vec4 minDist(vec4 d1,vec4 d2)
+{
+	return d1.a < d2.a ? d1 : d2;	
+}
+
+vec3 getColor(vec3 p)
+{
+	vec3 rotPos = rotate(p,radians(-50.0),vec3(0.2,1.0,0.0));
+	vec4 color = minDist(vec4(vec3(0.53,0.44,0.64),distCup(rotPos)),
+			    vec4(vec3(0.85,0.84,0.44),distDesk(rotPos)));
+	vec4 c2 = minDist(color,vec4(vec3(0.25,0.85,0.53),distFloor(rotPos)));
+	return c2.rgb;
+}
+
+vec3 cameraMove(vec3 p)
 {
 	return vec3(p.x * sin(p.y) * cos(p.z),p.x * sin(p.y) * sin(p.z),p.x * cos(p.y));
 }
@@ -126,7 +151,7 @@ vec3 convert(vec3 p)
 vec4 mainImage(vec2 p)
 {
 	vec3 cameraPos = vec3(0.0,1.0,7.0);
-	cameraPos += convert(vec3(2.0,radians(20.0*time),radians(30.0*time)));
+	cameraPos += cameraMove(vec3(2.0,radians(20.0*time),radians(30.0*time)));
 	vec3 ray = normalize(vec3(sin(fov) * p.x,sin(fov) * p.y,-cos(fov)));
 	
 	float dist = 0.0;
@@ -144,7 +169,8 @@ vec4 mainImage(vec2 p)
 		d = normalize(d);
 		float b = clamp(dot(normal,d),0.02,1.0);
 		float a = 1.0 / (atte.x + atte.y * len + atte.z * len * len);
-		return vec4(vec3(b * a),1.0);
+		vec3 color = getColor(rayPos);
+		return vec4(vec3(b * a) * color,1.0);
 	}else{
 		return vec4(vec3(0.0),1.0);	
 	}
