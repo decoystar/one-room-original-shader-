@@ -134,12 +134,26 @@ vec4 minDist(vec4 d1,vec4 d2)
 	return d1.a < d2.a ? d1 : d2;	
 }
 
+vec2 brickTile(vec2 p,float zoom)
+{
+	p *= zoom;
+	p.x += step(1.0,mod(p.y,2.0)) * 0.5;
+	return fract(p);
+}
+float tile(vec2 p,vec2 size)
+{
+	size = vec2(0.5) - size * 0.5;
+	vec2 uv = smoothstep(size,size + vec2(1e-4),p);
+	uv *= smoothstep(size,size+vec2(1e-4),vec2(2.0)-p);
+	return uv.x * uv.y;
+}
+
 vec3 getColor(vec3 p)
 {
 	vec3 rotPos = rotate(p,radians(-50.0),vec3(0.2,1.0,0.0));
 	vec4 color = minDist(vec4(vec3(0.53,0.44,0.64),distCup(rotPos)),
-			    vec4(vec3(0.85,0.84,0.44),distDesk(rotPos)));
-	vec4 c2 = minDist(color,vec4(vec3(0.25,0.85,0.53),distFloor(rotPos)));
+			    vec4(vec3(0.80,0.63,0.42),distDesk(rotPos)));
+	vec4 c2 = minDist(color,vec4(vec3(0.40,0.23,0.20)*tile(brickTile(rotPos.xz,1.0),vec2(0.89)),distFloor(rotPos)));
 	return c2.rgb;
 }
 
