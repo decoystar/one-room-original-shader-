@@ -13,7 +13,8 @@ float angle = 60.0;
 float fov = angle * 0.5 * PI / 180.0;
 
 vec3 lightPos = vec3(-0.53,3.72,0.73);
-vec3 atte = vec3(0.89,0.1,0.01);
+vec3 amb = vec3(1.0);
+vec3 atte = vec3(0.89,0.01,0.1);
 
 vec3 moveSp(vec3 p)
 {
@@ -77,6 +78,34 @@ float distPlane(vec3 p,vec3 n)
 	return dot(p,n) + 3.5;
 }
 
+float distSphere(vec3 p,float r)
+{
+	return length(p) - r;	
+}
+float distCone( in vec3 p, in float r1, float r2, float h )
+{
+    vec2 q = vec2( length(p.xz), p.y );
+    
+    float b = (r1-r2)/h;
+    float a = sqrt(1.0-b*b);
+    float k = dot(q,vec2(-b,a));
+    
+    if( k < 0.0 ) return length(q) - r1;
+    if( k > a*h ) return length(q-vec2(0.0,h)) - r2;
+        
+    return dot(q, vec2(a,b) ) - r1;
+}
+
+float distBulb(vec3 p)
+{
+	float cy = distCylinder(p+vec3(0.0,2.0,0.0),0.07,0.3,0.8);
+	float sp = distSphere(p+vec3(0.0,4.2,0.0),0.9);
+	float sc = distCone(p+vec3(0.0,4.0,0.0),0.89,0.3,1.4);
+	float b = distCone(p+vec3(0.0,4.0,0.0),0.3,0.2,0.4);
+	
+	return min(min(opSubtract(sp,sc),cy),b);
+}
+
 float distCup(vec3 p)
 {
 	vec3 cupRot = rotate(p,radians(-20.0),vec3(0.0,1.0,0.0));
@@ -109,14 +138,15 @@ float distFloor(vec3 p)
 	return distPlane(p+vec3(0.0,-0.06,0.0),vec3(0.0,1.0,0.0));
 }
 
+
 float distFunc(vec3 p)
 {
 	vec3 rotPos = rotate(p,radians(-50.0),vec3(0.2,1.0,0.0));
-	
 	float desk = distDesk(rotPos);
 	float mgcup = distCup(rotPos);
 	float flr = distFloor(rotPos);
-	return min(min(desk,mgcup),flr);
+	float bulb = distBulb(p+vec3(0.0,-12.0,0.0));
+	return min(min(min(desk,mgcup),flr),bulb);
 }
 
 vec3 getNormal(vec3 p)
@@ -169,7 +199,8 @@ vec3 getColor(vec3 p)
 	vec4 color = minDist(vec4(vec3(0.53*sin(time-p.y),0.44*cos(p.x-time),0.64),distCup(rotPos)),
 			    vec4(vec3(0.80,0.63,0.42),distDesk(rotPos)));
 	vec4 c2 = minDist(color,vec4(vec3(0.40,0.23,0.20)*tile(brickTile(rotPos.xz,1.0),vec2(0.89)),distFloor(rotPos)));
-	return c2.rgb;
+	vec4 l = minDist(c2,vec4(vec3(pow(2.3,2.0)),distBulb(p+vec3(0.0,-12.0,0.0))));
+	return l.rgb;
 }
 
 vec3 cameraMove(vec3 p)
@@ -179,7 +210,7 @@ vec3 cameraMove(vec3 p)
 
 vec4 mainImage(vec2 p)
 {
-	vec3 cameraPos = vec3(0.0,1.0,7.0);
+	vec3 cameraPos = vec3(0.0,3.0,12.0);
 	cameraPos += cameraMove(vec3(2.0,radians(20.0*time),radians(30.0*time)));
 	vec3 ray = normalize(vec3(sin(fov) * p.x,sin(fov) * p.y,-cos(fov)));
 	
@@ -195,19 +226,20 @@ vec4 mainImage(vec2 p)
 	vec3 flagColor;
 	if(abs(dist) < 0.001){
 		vec3 normal = getNormal(rayPos);
-		lightPos = moveSp(lightPos);
+		//lightPos = moveSp(lightPos);
 		vec3 d = lightPos - rayPos;
 		float len = length(d);
 		d = normalize(d);
 		float b = clamp(dot(normal,d),0.02,1.0);
-		float a = 1.0 / (atte.x + atte.y * len + atte.z * len * len);
-		vec3 color = getColor(rayPos);
+		float e = abs(sin(time))*2.5;
+		float a = e / (atte.x + atte.y * len + atte.z * len * len);
+		vec3 color= getColor(rayPos);
 		shadow = getShadow(rayPos + normal * 0.001,d);
-		flagColor = vec3(b*a) * color;
+		flagColor = vec3(b*a) * color * amb;
 	}else{
-		flagColor = vec3(0.0);
+		flagColor = vec3(0.01);
 	}
-	return vec4(flagColor*max(0.5,shadow),1.0);
+	return vec4(flagColor*max(0.5,shadow)*amb,1.0);
 }
 
 void main( void ) {
