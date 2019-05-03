@@ -231,10 +231,10 @@ vec4 mainImage(vec2 p)
 		float len = length(d);
 		d = normalize(d);
 		float b = clamp(dot(normal,d),0.02,1.0);
-		float e = abs(sin(time))*2.5;
+		float e = smoothstep(abs(cos(time*3.0) * sin(time*0.8)),0.6,0.5) * 0.8;
 		float a = e / (atte.x + atte.y * len + atte.z * len * len);
 		vec3 color= getColor(rayPos);
-		shadow = getShadow(rayPos + normal * 0.001,d);
+		shadow = getShadow(rayPos + normal * 0.001,d) * smoothstep(0.05,0.99,e);
 		flagColor = vec3(b*a) * color * amb;
 	}else{
 		flagColor = vec3(0.01);
