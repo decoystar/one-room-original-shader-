@@ -94,10 +94,10 @@ float distCup(vec3 p)
 float distDesk(vec3 p)
 {
 	float table = distBox(p,vec3(2.5,0.01,2.5),0.3);
-	float reg1 = distBox(p + vec3(2.0,1.9,2.0),vec3(0.1,1.5,0.1),0.2);
-	float reg2 = distBox(p + vec3(-2.0,1.9,-2.0),vec3(0.1,1.5,0.1),0.2);
-	float reg3 = distBox(p + vec3(-2.0,1.9,2.0),vec3(0.1,1.5,0.1),0.2);
-	float reg4 = distBox(p + vec3(2.0,1.9,-2.0),vec3(0.1,1.5,0.1),0.2);
+	float reg1 = distBox(p + vec3(2.0,2.3,2.0),vec3(0.1,1.7,0.1),0.2);
+	float reg2 = distBox(p + vec3(-2.0,2.3,-2.0),vec3(0.1,1.7,0.1),0.2);
+	float reg3 = distBox(p + vec3(-2.0,2.3,2.0),vec3(0.1,1.7,0.1),0.2);
+	float reg4 = distBox(p + vec3(2.0,2.3,-2.0),vec3(0.1,1.7,0.1),0.2);
 	float r1 = min(reg1,reg2);
 	float r2 = min(reg3,reg4);
 	float r3 = min(r1,r2);
@@ -129,6 +129,21 @@ vec3 getNormal(vec3 p)
 	));
 }
 
+float getShadow(vec3 rayInit,vec3 rayLight)
+{
+	float h = 0.0;
+	float c = 0.001;
+	float r = 1.0;
+	float shadowCoef = 0.3;
+	for(float t = 0.0;t < 50.0;++t){
+		h = distFunc(rayInit + rayLight * c);
+		if(h < 0.001){return shadowCoef;}
+		r = min(r,h * 4.0 / c);
+		c += h;
+	}
+	return 1.0 - shadowCoef + r * shadowCoef;
+}
+
 vec4 minDist(vec4 d1,vec4 d2)
 {
 	return d1.a < d2.a ? d1 : d2;	
@@ -151,7 +166,7 @@ float tile(vec2 p,vec2 size)
 vec3 getColor(vec3 p)
 {
 	vec3 rotPos = rotate(p,radians(-50.0),vec3(0.2,1.0,0.0));
-	vec4 color = minDist(vec4(vec3(0.53,0.44,0.64),distCup(rotPos)),
+	vec4 color = minDist(vec4(vec3(0.53*sin(time-p.y),0.44*cos(p.x-time),0.64),distCup(rotPos)),
 			    vec4(vec3(0.80,0.63,0.42),distDesk(rotPos)));
 	vec4 c2 = minDist(color,vec4(vec3(0.40,0.23,0.20)*tile(brickTile(rotPos.xz,1.0),vec2(0.89)),distFloor(rotPos)));
 	return c2.rgb;
@@ -176,18 +191,23 @@ vec4 mainImage(vec2 p)
 		rayLen += dist;
 		rayPos = cameraPos + ray * rayLen;
 	}
+	float shadow = 1.0;
+	vec3 flagColor;
 	if(abs(dist) < 0.001){
 		vec3 normal = getNormal(rayPos);
-		vec3 d = moveSp(lightPos) - rayPos;
+		lightPos = moveSp(lightPos);
+		vec3 d = lightPos - rayPos;
 		float len = length(d);
 		d = normalize(d);
 		float b = clamp(dot(normal,d),0.02,1.0);
 		float a = 1.0 / (atte.x + atte.y * len + atte.z * len * len);
 		vec3 color = getColor(rayPos);
-		return vec4(vec3(b * a) * color,1.0);
+		shadow = getShadow(rayPos + normal * 0.001,d);
+		flagColor = vec3(b*a) * color;
 	}else{
-		return vec4(vec3(0.0),1.0);	
+		flagColor = vec3(0.0);
 	}
+	return vec4(flagColor*max(0.5,shadow),1.0);
 }
 
 void main( void ) {
